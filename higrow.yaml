@@ -1,0 +1,144 @@
+esphome:
+  name: higrow
+  comment: Flower monitor
+  # on_boot:
+  #   priority: -400.0
+  #   then:
+  #     - script.execute: consider_deep_sleep
+
+esp32:
+  board: lolin32
+  framework:
+    type: arduino
+
+
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+deep_sleep:
+  id: deep_sleep_control
+  run_duration: 8s
+  sleep_duration: 3600s
+
+wifi:
+  ssid: "WudiGYQ2"
+  password: "0Kddffsgd!"
+  fast_connect: true
+  power_save_mode: high
+  manual_ip:
+    static_ip: 192.168.0.110
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+  
+i2c:
+  sda: 25
+  scl: 26
+  scan: False
+  id: bus_a
+  setup_priority: -200
+
+
+# script:
+#   - id: consider_deep_sleep
+#     mode: queued
+#     then:
+#       - if:
+#           condition:
+#             binary_sensor.is_on: prevent_deep_sleep
+#           then:
+#             - logger.log: 'Skipping sleep, per prevent_deep_sleep'
+#             - delay: 10s
+#           else:
+#             - deep_sleep.enter: deep_sleep_control
+#       - script.execute: consider_deep_sleep
+
+# Sensor power control pin , use detected must set high
+switch:
+  - platform: gpio
+    pin: GPIO4
+    name: "Sensor Power"
+    id: spower
+    restore_mode: ALWAYS_ON
+    internal: true
+    setup_priority: 1000
+
+sensor:
+  - platform: adc
+    pin: 34
+    name: "HiGrow Salt"
+    device_class: humidity
+    attenuation: 11db
+    update_interval: 60s
+    unit_of_measurement: '%'
+    filters:
+      - calibrate_linear:
+          - 0.06 -> 0.0
+          - 1.8 -> 100.0
+  - platform: adc
+    pin: 32
+    name: "HiGrow Soil"
+    device_class: humidity
+    update_interval: 60s
+    attenuation: 11db
+    unit_of_measurement: '%'
+    filters:
+      - calibrate_linear:
+          - 2.6 -> 0.0
+          - 1.2 -> 100.0
+      # - lambda: return max(double(x), 0.00);
+  - platform: adc
+    pin: 33
+    name: "voltage"
+    id: "higrow_voltage"
+    attenuation: 11db
+    unit_of_measurement: 'V'
+    update_interval: 60s
+    filters:
+      - calibrate_linear:
+          - 0.0 -> 0.0
+          - 2.06 -> 1.89
+      - lambda: return x * 2.0;
+
+  - platform: template
+    name: "battery_level"
+    device_class: battery
+    setup_priority: -200
+    unit_of_measurement: '%'
+    update_interval: 60s
+    lambda: |-
+      return min((((id(higrow_voltage).state- 2.70) /0.98) * 100.00), 100.0);
+  - platform: bh1750
+    name: "BH1750 Illuminance"
+    address: 0x23
+    update_interval: 60s
+    setup_priority: -200
+  - platform: bme280
+    temperature:
+      name: "BME280 Temperature"
+      oversampling: 16x
+    pressure:
+      name: "BME280 Pressure"
+    humidity:
+      name: "BME280 Humidity"
+    address: 0x77
+    update_interval: 60s
+    setup_priority: -200
+
+binary_sensor:
+  # - platform: homeassistant
+  #   id: prevent_deep_sleep
+  #   entity_id: input_boolean.prevent_deep_sleep
+  - platform: template
+    name: "Charging"
+    device_class: "battery_charging"
+    lambda: |-
+      if (id(higrow_voltage).state > 4.0) {
+        return true;
+      } else {
+        return false;
+      }
