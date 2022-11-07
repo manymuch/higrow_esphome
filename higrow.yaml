@@ -26,8 +26,8 @@ deep_sleep:
   sleep_duration: 3600s
 
 wifi:
-  ssid: "WudiGYQ2"
-  password: "0Kddffsgd!"
+  ssid: "SSID"
+  password: "PASSWD"
   fast_connect: true
   power_save_mode: high
   manual_ip:
